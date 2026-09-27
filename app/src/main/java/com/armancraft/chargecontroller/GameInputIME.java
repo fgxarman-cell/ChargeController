@@ -31,6 +31,7 @@ public class GameInputIME extends InputMethodService {
     }
 
     public static boolean sendKey(int keyCode) {
+
         if (instance == null) {
             return false;
         }
@@ -49,11 +50,7 @@ public class GameInputIME extends InputMethodService {
                 now,
                 KeyEvent.ACTION_DOWN,
                 keyCode,
-                0,
-                0,
-                KeyEvent.VIRTUAL_KEYBOARD,
-                0,
-                KeyEvent.FLAG_SOFT_KEYBOARD
+                0
         );
 
         KeyEvent up = new KeyEvent(
@@ -61,11 +58,7 @@ public class GameInputIME extends InputMethodService {
                 now,
                 KeyEvent.ACTION_UP,
                 keyCode,
-                0,
-                0,
-                KeyEvent.VIRTUAL_KEYBOARD,
-                0,
-                KeyEvent.FLAG_SOFT_KEYBOARD
+                0
         );
 
         boolean downResult =
