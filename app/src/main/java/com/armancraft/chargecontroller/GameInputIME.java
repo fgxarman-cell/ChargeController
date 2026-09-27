@@ -3,50 +3,77 @@ package com.armancraft.chargecontroller;
 import android.inputmethodservice.InputMethodService;
 import android.view.KeyEvent;
 import android.view.View;
-import android.widget.TextView;
+import android.view.inputmethod.InputConnection;
 
 public class GameInputIME extends InputMethodService {
 
-    private static GameInputIME currentInstance;
-
-    public static void sendKey(int keyCode) {
-        if (currentInstance != null) {
-            currentInstance.sendKeyInternal(keyCode);
-        }
-    }
+    private static GameInputIME instance;
 
     @Override
     public void onCreate() {
         super.onCreate();
-        currentInstance = this;
+        instance = this;
     }
 
     @Override
     public void onDestroy() {
-        if (currentInstance == this) {
-            currentInstance = null;
+        if (instance == this) {
+            instance = null;
         }
-
         super.onDestroy();
     }
 
     @Override
     public View onCreateInputView() {
-        TextView view = new TextView(this);
-
-        view.setText("Charge Controller");
-        view.setTextSize(1);
+        View view = new View(this);
         view.setVisibility(View.INVISIBLE);
-
         return view;
     }
 
-    private void sendKeyInternal(int keyCode) {
-
-        if (getCurrentInputConnection() == null) {
-            return;
+    public static boolean sendKey(int keyCode) {
+        if (instance == null) {
+            return false;
         }
 
-        sendDownUpKeyEvents(keyCode);
+        InputConnection connection =
+                instance.getCurrentInputConnection();
+
+        if (connection == null) {
+            return false;
+        }
+
+        long now = System.currentTimeMillis();
+
+        KeyEvent down = new KeyEvent(
+                now,
+                now,
+                KeyEvent.ACTION_DOWN,
+                keyCode,
+                0,
+                0,
+                KeyEvent.VIRTUAL_KEYBOARD,
+                0,
+                KeyEvent.FLAG_SOFT_KEYBOARD
+        );
+
+        KeyEvent up = new KeyEvent(
+                now,
+                now,
+                KeyEvent.ACTION_UP,
+                keyCode,
+                0,
+                0,
+                KeyEvent.VIRTUAL_KEYBOARD,
+                0,
+                KeyEvent.FLAG_SOFT_KEYBOARD
+        );
+
+        boolean downResult =
+                connection.sendKeyEvent(down);
+
+        boolean upResult =
+                connection.sendKeyEvent(up);
+
+        return downResult || upResult;
     }
 }
