@@ -33,13 +33,22 @@ public class OverlayService extends Service {
     private static final int NOTIFICATION_ID = 1001;
 
     private WindowManager windowManager;
+
     private View overlayView;
     private WindowManager.LayoutParams params;
+
+    private View spaceView;
+    private WindowManager.LayoutParams spaceParams;
 
     private float initialX;
     private float initialY;
     private int initialTouchX;
     private int initialTouchY;
+
+    private float spaceInitialX;
+    private float spaceInitialY;
+    private int spaceInitialTouchX;
+    private int spaceInitialTouchY;
 
     private SharedPreferences prefs;
 
@@ -63,6 +72,7 @@ public class OverlayService extends Service {
         );
 
         showOverlay();
+        showSpaceButton();
     }
 
     @Override
@@ -76,12 +86,17 @@ public class OverlayService extends Service {
             showOverlay();
         }
 
+        if (spaceView == null) {
+            showSpaceButton();
+        }
+
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         removeOverlay();
+        removeSpaceButton();
         super.onDestroy();
     }
 
@@ -145,6 +160,20 @@ public class OverlayService extends Service {
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build();
+    }
+
+    private int getWindowType() {
+
+        if (Build.VERSION.SDK_INT >=
+                Build.VERSION_CODES.O) {
+
+            return WindowManager.LayoutParams
+                    .TYPE_APPLICATION_OVERLAY;
+
+        } else {
+
+            return WindowManager.LayoutParams.TYPE_PHONE;
+        }
     }
 
     private void showOverlay() {
@@ -387,26 +416,11 @@ public class OverlayService extends Service {
                 }
         );
 
-        int windowType;
-
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.O) {
-
-            windowType =
-                    WindowManager.LayoutParams
-                            .TYPE_APPLICATION_OVERLAY;
-
-        } else {
-
-            windowType =
-                    WindowManager.LayoutParams.TYPE_PHONE;
-        }
-
         params =
                 new WindowManager.LayoutParams(
                         WindowManager.LayoutParams.WRAP_CONTENT,
                         WindowManager.LayoutParams.WRAP_CONTENT,
-                        windowType,
+                        getWindowType(),
                         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
                                 |
                                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
@@ -433,19 +447,157 @@ public class OverlayService extends Service {
 
             Log.i(
                     TAG,
-                    "Overlay added"
+                    "WASD overlay added"
             );
 
         } catch (Exception e) {
 
             Log.e(
                     TAG,
-                    "Failed to add overlay",
+                    "Failed to add WASD overlay",
                     e
             );
 
             overlayView = null;
-            stopSelf();
+        }
+    }
+
+    private void showSpaceButton() {
+
+        if (spaceView != null) {
+            return;
+        }
+
+        Button buttonSpace =
+                createKeyButton(
+                        "SPACE",
+                        android.view.KeyEvent.KEYCODE_SPACE
+                );
+
+        spaceView = buttonSpace;
+
+        spaceParams =
+                new WindowManager.LayoutParams(
+                        WindowManager.LayoutParams.WRAP_CONTENT,
+                        WindowManager.LayoutParams.WRAP_CONTENT,
+                        getWindowType(),
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                                |
+                                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                                |
+                                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                        PixelFormat.TRANSLUCENT
+                );
+
+        spaceParams.gravity =
+                Gravity.BOTTOM |
+                        Gravity.END;
+
+        spaceParams.x = 24;
+        spaceParams.y = 120;
+
+        buttonSpace.setOnTouchListener(
+                new View.OnTouchListener() {
+
+                    @Override
+                    public boolean onTouch(
+                            View v,
+                            MotionEvent event
+                    ) {
+
+                        switch (event.getAction()) {
+
+                            case MotionEvent.ACTION_DOWN:
+
+                                spaceInitialX =
+                                        spaceParams.x;
+
+                                spaceInitialY =
+                                        spaceParams.y;
+
+                                spaceInitialTouchX =
+                                        (int) event.getRawX();
+
+                                spaceInitialTouchY =
+                                        (int) event.getRawY();
+
+                                GameInputIME.keyDown(
+                                        android.view.KeyEvent.KEYCODE_SPACE
+                                );
+
+                                return true;
+
+                            case MotionEvent.ACTION_MOVE:
+
+                                spaceParams.x =
+                                        (int) (
+                                                spaceInitialX
+                                                        - event.getRawX()
+                                                        + spaceInitialTouchX
+                                        );
+
+                                spaceParams.y =
+                                        (int) (
+                                                spaceInitialY
+                                                        - event.getRawY()
+                                                        + spaceInitialTouchY
+                                        );
+
+                                try {
+
+                                    windowManager.updateViewLayout(
+                                            spaceView,
+                                            spaceParams
+                                    );
+
+                                } catch (Exception e) {
+
+                                    Log.e(
+                                            TAG,
+                                            "Failed to move SPACE",
+                                            e
+                                    );
+                                }
+
+                                return true;
+
+                            case MotionEvent.ACTION_UP:
+
+                            case MotionEvent.ACTION_CANCEL:
+
+                                GameInputIME.keyUp(
+                                        android.view.KeyEvent.KEYCODE_SPACE
+                                );
+
+                                return true;
+                        }
+
+                        return true;
+                    }
+                }
+        );
+
+        try {
+
+            windowManager.addView(
+                    spaceView,
+                    spaceParams
+            );
+
+            Log.i(
+                    TAG,
+                    "SPACE button added"
+            );
+
+        } catch (Exception e) {
+
+            Log.e(
+                    TAG,
+                    "Failed to add SPACE button",
+                    e
+            );
+
+            spaceView = null;
         }
     }
 
@@ -608,7 +760,7 @@ public class OverlayService extends Service {
 
                 Log.w(
                         TAG,
-                        "Error removing overlay",
+                        "Error removing WASD overlay",
                         e
                 );
             }
@@ -616,4 +768,28 @@ public class OverlayService extends Service {
             overlayView = null;
         }
     }
+
+    private void removeSpaceButton() {
+
+        if (spaceView != null &&
+                windowManager != null) {
+
+            try {
+
+                windowManager.removeView(
+                        spaceView
+                );
+
+            } catch (Exception e) {
+
+                Log.w(
+                        TAG,
+                        "Error removing SPACE button",
+                        e
+                );
             }
+
+            spaceView = null;
+        }
+    }
+    }
