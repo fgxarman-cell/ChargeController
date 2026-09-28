@@ -22,14 +22,14 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.core.app.NotificationCompat;
 
 public class OverlayService extends Service {
 
     private static final String TAG = "OverlayService";
-    private static final String CHANNEL_ID = "charge_controller_overlay";
+    private static final String CHANNEL_ID =
+            "charge_controller_overlay";
     private static final int NOTIFICATION_ID = 1001;
 
     private WindowManager windowManager;
@@ -71,6 +71,7 @@ public class OverlayService extends Service {
             int flags,
             int startId
     ) {
+
         if (overlayView == null) {
             showOverlay();
         }
@@ -105,7 +106,9 @@ public class OverlayService extends Service {
             );
 
             NotificationManager manager =
-                    getSystemService(NotificationManager.class);
+                    getSystemService(
+                            NotificationManager.class
+                    );
 
             if (manager != null) {
                 manager.createNotificationChannel(channel);
@@ -123,7 +126,8 @@ public class OverlayService extends Service {
                         this,
                         0,
                         intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT |
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                                |
                                 PendingIntent.FLAG_IMMUTABLE
                 );
 
@@ -132,7 +136,9 @@ public class OverlayService extends Service {
                 CHANNEL_ID
         )
                 .setContentTitle("Charge Controller")
-                .setContentText("Controller overlay active")
+                .setContentText(
+                        "Controller overlay active"
+                )
                 .setSmallIcon(
                         android.R.drawable.ic_menu_compass
                 )
@@ -143,8 +149,8 @@ public class OverlayService extends Service {
 
     private void showOverlay() {
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
-                !Settings.canDrawOverlays(this)) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && !Settings.canDrawOverlays(this)) {
 
             Log.w(
                     TAG,
@@ -330,11 +336,8 @@ public class OverlayService extends Service {
 
                             case MotionEvent.ACTION_DOWN:
 
-                                initialX =
-                                        params.x;
-
-                                initialY =
-                                        params.y;
+                                initialX = params.x;
+                                initialY = params.y;
 
                                 initialTouchX =
                                         (int) event.getRawX();
@@ -348,18 +351,16 @@ public class OverlayService extends Service {
 
                                 params.x =
                                         (int) (
-                                                initialX +
-                                                        event.getRawX()
-                                                                -
-                                                                initialTouchX
+                                                initialX
+                                                        + event.getRawX()
+                                                        - initialTouchX
                                         );
 
                                 params.y =
                                         (int) (
-                                                initialY +
-                                                        event.getRawY()
-                                                                -
-                                                                initialTouchY
+                                                initialY
+                                                        + event.getRawY()
+                                                        - initialTouchY
                                         );
 
                                 try {
@@ -561,7 +562,8 @@ public class OverlayService extends Service {
                                 );
 
                         intent.addFlags(
-                                Intent.FLAG_ACTIVITY_NEW_TASK |
+                                Intent.FLAG_ACTIVITY_NEW_TASK
+                                        |
                                         Intent.FLAG_ACTIVITY_SINGLE_TOP
                         );
 
@@ -613,96 +615,5 @@ public class OverlayService extends Service {
 
             overlayView = null;
         }
-
     }
-    }
-} package com.armancraft.chargecontroller;
-
-import android.inputmethodservice.InputMethodService;
-import android.view.KeyEvent;
-import android.view.View;
-import android.view.inputmethod.InputConnection;
-
-public class GameInputIME extends InputMethodService {
-
-    private static GameInputIME instance;
-
-    @Override
-    public void onCreate() {
-        super.onCreate();
-        instance = this;
-    }
-
-    @Override
-    public void onDestroy() {
-        if (instance == this) {
-            instance = null;
-        }
-        super.onDestroy();
-    }
-
-    @Override
-    public View onCreateInputView() {
-        View view = new View(this);
-        view.setVisibility(View.INVISIBLE);
-        return view;
-    }
-
-    public static boolean keyDown(int keyCode) {
-
-        if (instance == null) {
-            return false;
-        }
-
-        InputConnection connection =
-                instance.getCurrentInputConnection();
-
-        if (connection == null) {
-            return false;
-        }
-
-        long now = System.currentTimeMillis();
-
-        KeyEvent event = new KeyEvent(
-                now,
-                now,
-                KeyEvent.ACTION_DOWN,
-                keyCode,
-                0
-        );
-
-        return connection.sendKeyEvent(event);
-    }
-
-    public static boolean keyUp(int keyCode) {
-
-        if (instance == null) {
-            return false;
-        }
-
-        InputConnection connection =
-                instance.getCurrentInputConnection();
-
-        if (connection == null) {
-            return false;
-        }
-
-        long now = System.currentTimeMillis();
-
-        KeyEvent event = new KeyEvent(
-                now,
-                now,
-                KeyEvent.ACTION_UP,
-                keyCode,
-                0
-        );
-
-        return connection.sendKeyEvent(event);
-    }
-
-    public static boolean sendKey(int keyCode) {
-        boolean down = keyDown(keyCode);
-        boolean up = keyUp(keyCode);
-        return down || up;
-    }
-}
+            }
