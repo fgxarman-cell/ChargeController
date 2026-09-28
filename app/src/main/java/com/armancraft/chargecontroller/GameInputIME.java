@@ -30,7 +30,7 @@ public class GameInputIME extends InputMethodService {
         return view;
     }
 
-    public static boolean sendKey(int keyCode) {
+    public static boolean keyDown(int keyCode) {
 
         if (instance == null) {
             return false;
@@ -45,7 +45,7 @@ public class GameInputIME extends InputMethodService {
 
         long now = System.currentTimeMillis();
 
-        KeyEvent down = new KeyEvent(
+        KeyEvent event = new KeyEvent(
                 now,
                 now,
                 KeyEvent.ACTION_DOWN,
@@ -53,7 +53,25 @@ public class GameInputIME extends InputMethodService {
                 0
         );
 
-        KeyEvent up = new KeyEvent(
+        return connection.sendKeyEvent(event);
+    }
+
+    public static boolean keyUp(int keyCode) {
+
+        if (instance == null) {
+            return false;
+        }
+
+        InputConnection connection =
+                instance.getCurrentInputConnection();
+
+        if (connection == null) {
+            return false;
+        }
+
+        long now = System.currentTimeMillis();
+
+        KeyEvent event = new KeyEvent(
                 now,
                 now,
                 KeyEvent.ACTION_UP,
@@ -61,12 +79,12 @@ public class GameInputIME extends InputMethodService {
                 0
         );
 
-        boolean downResult =
-                connection.sendKeyEvent(down);
+        return connection.sendKeyEvent(event);
+    }
 
-        boolean upResult =
-                connection.sendKeyEvent(up);
-
-        return downResult || upResult;
+    public static boolean sendKey(int keyCode) {
+        boolean down = keyDown(keyCode);
+        boolean up = keyUp(keyCode);
+        return down || up;
     }
 }
