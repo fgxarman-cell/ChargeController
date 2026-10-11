@@ -6,7 +6,6 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.graphics.drawable.GradientDrawable;
@@ -28,8 +27,7 @@ import androidx.core.app.NotificationCompat;
 public class OverlayService extends Service {
 
     private static final String TAG = "OverlayService";
-    private static final String CHANNEL_ID =
-            "charge_controller_overlay";
+    private static final String CHANNEL_ID = "charge_controller_overlay";
     private static final int NOTIFICATION_ID = 1001;
 
     private WindowManager windowManager;
@@ -37,57 +35,37 @@ public class OverlayService extends Service {
     private View overlayView;
     private WindowManager.LayoutParams params;
 
-    private View spaceView;
-    private WindowManager.LayoutParams spaceParams;
+    private View numberView;
+    private WindowManager.LayoutParams numberParams;
+
+    private boolean numberKeyboardVisible = false;
 
     private float initialX;
     private float initialY;
     private int initialTouchX;
     private int initialTouchY;
 
-    private float spaceInitialX;
-    private float spaceInitialY;
-    private int spaceInitialTouchX;
-    private int spaceInitialTouchY;
-
-    private SharedPreferences prefs;
+    private float numberInitialX;
+    private float numberInitialY;
+    private int numberInitialTouchX;
+    private int numberInitialTouchY;
 
     @Override
     public void onCreate() {
         super.onCreate();
 
-        prefs = getSharedPreferences(
-                "ChargeControllerPrefs",
-                MODE_PRIVATE
-        );
-
-        windowManager =
-                (WindowManager) getSystemService(WINDOW_SERVICE);
+        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
         createNotificationChannel();
-
-        startForeground(
-                NOTIFICATION_ID,
-                buildNotification()
-        );
+        startForeground(NOTIFICATION_ID, buildNotification());
 
         showOverlay();
-        showSpaceButton();
     }
 
     @Override
-    public int onStartCommand(
-            Intent intent,
-            int flags,
-            int startId
-    ) {
-
+    public int onStartCommand(Intent intent, int flags, int startId) {
         if (overlayView == null) {
             showOverlay();
-        }
-
-        if (spaceView == null) {
-            showSpaceButton();
         }
 
         return START_STICKY;
@@ -96,7 +74,7 @@ public class OverlayService extends Service {
     @Override
     public void onDestroy() {
         removeOverlay();
-        removeSpaceButton();
+        removeNumberKeyboard();
         super.onDestroy();
     }
 
@@ -106,24 +84,17 @@ public class OverlayService extends Service {
     }
 
     private void createNotificationChannel() {
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-
-            NotificationChannel channel =
-                    new NotificationChannel(
-                            CHANNEL_ID,
-                            "Charge Controller Overlay",
-                            NotificationManager.IMPORTANCE_LOW
-                    );
-
-            channel.setDescription(
-                    "Charge Controller overlay"
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID,
+                    "Charge Controller Overlay",
+                    NotificationManager.IMPORTANCE_LOW
             );
 
+            channel.setDescription("Charge Controller overlay");
+
             NotificationManager manager =
-                    getSystemService(
-                            NotificationManager.class
-                    );
+                    getSystemService(NotificationManager.class);
 
             if (manager != null) {
                 manager.createNotificationChannel(channel);
@@ -132,60 +103,63 @@ public class OverlayService extends Service {
     }
 
     private Notification buildNotification() {
+        Intent intent = new Intent(this, MainActivity.class);
 
-        Intent intent =
-                new Intent(this, MainActivity.class);
-
-        PendingIntent pendingIntent =
-                PendingIntent.getActivity(
-                        this,
-                        0,
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT
-                                |
-                                PendingIntent.FLAG_IMMUTABLE
-                );
-
-        return new NotificationCompat.Builder(
+        PendingIntent pendingIntent = PendingIntent.getActivity(
                 this,
-                CHANNEL_ID
-        )
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT
+                        | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("Charge Controller")
-                .setContentText(
-                        "Controller overlay active"
-                )
-                .setSmallIcon(
-                        android.R.drawable.ic_menu_compass
-                )
+                .setContentText("Controller overlay active")
+                .setSmallIcon(android.R.drawable.ic_menu_compass)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .build();
     }
 
     private int getWindowType() {
-
-        if (Build.VERSION.SDK_INT >=
-                Build.VERSION_CODES.O) {
-
-            return WindowManager.LayoutParams
-                    .TYPE_APPLICATION_OVERLAY;
-
-        } else {
-
-            return WindowManager.LayoutParams.TYPE_PHONE;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            return WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
         }
+
+        return WindowManager.LayoutParams.TYPE_PHONE;
+    }
+
+    private WindowManager.LayoutParams createWindowParams(int gravity) {
+        WindowManager.LayoutParams result =
+                new WindowManager.LayoutParams(
+                        WindowManager.LayoutParams.WRAP_CONTENT,
+                        WindowManager.LayoutParams.WRAP_CONTENT,
+                        getWindowType(),
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+                                | WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                                | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                        PixelFormat.TRANSLUCENT
+                );
+
+        result.gravity = gravity;
+        return result;
+    }
+
+    private GradientDrawable createBackground(
+            int color,
+            int strokeColor
+    ) {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(color);
+        background.setCornerRadius(16);
+        background.setStroke(2, strokeColor);
+        return background;
     }
 
     private void showOverlay() {
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                 && !Settings.canDrawOverlays(this)) {
-
-            Log.w(
-                    TAG,
-                    "Overlay permission not granted"
-            );
-
             stopSelf();
             return;
         }
@@ -194,602 +168,349 @@ public class OverlayService extends Service {
             return;
         }
 
-        LinearLayout root =
-                new LinearLayout(this);
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(8, 8, 8, 8);
 
-        root.setOrientation(
-                LinearLayout.VERTICAL
-        );
+        root.setBackground(createBackground(
+                Color.argb(210, 30, 30, 30),
+                Color.argb(180, 100, 180, 255)
+        ));
 
-        root.setPadding(
-                8,
-                8,
-                8,
-                8
-        );
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
 
-        GradientDrawable background =
-                new GradientDrawable();
-
-        background.setColor(
-                Color.argb(
-                        210,
-                        30,
-                        30,
-                        30
-                )
-        );
-
-        background.setCornerRadius(18);
-
-        background.setStroke(
-                2,
-                Color.argb(
-                        180,
-                        100,
-                        180,
-                        255
-                )
-        );
-
-        root.setBackground(background);
-
-        LinearLayout topRow =
-                new LinearLayout(this);
-
-        topRow.setOrientation(
-                LinearLayout.HORIZONTAL
-        );
-
-        topRow.setGravity(
-                Gravity.CENTER_VERTICAL
-        );
-
-        Button menuButton =
-                new Button(this);
-
+        Button menuButton = new Button(this);
         menuButton.setText("☰");
         menuButton.setTextSize(14);
         menuButton.setTextColor(Color.WHITE);
-
         menuButton.setMinWidth(0);
         menuButton.setMinHeight(0);
-
-        menuButton.setPadding(
-                12,
-                4,
-                12,
-                4
-        );
-
-        menuButton.setBackgroundColor(
-                Color.TRANSPARENT
-        );
-
-        menuButton.setOnClickListener(
-                v -> showAppMenu(v)
-        );
+        menuButton.setPadding(12, 4, 12, 4);
+        menuButton.setBackgroundColor(Color.TRANSPARENT);
+        menuButton.setOnClickListener(v -> showAppMenu(v));
 
         topRow.addView(menuButton);
 
-        TextView title =
-                new TextView(this);
-
+        TextView title = new TextView(this);
         title.setText(" WASD ");
         title.setTextColor(Color.LTGRAY);
         title.setTextSize(11);
-
-        title.setPadding(
-                4,
-                8,
-                4,
-                0
-        );
-
+        title.setPadding(4, 8, 4, 0);
         topRow.addView(title);
 
         root.addView(topRow);
 
-        Button buttonW =
-                createKeyButton(
-                        "W",
-                        android.view.KeyEvent.KEYCODE_W
-                );
+        LinearLayout wRow = new LinearLayout(this);
+        wRow.setGravity(Gravity.CENTER_HORIZONTAL);
 
-        LinearLayout wRow =
-                new LinearLayout(this);
-
-        wRow.setGravity(
-                Gravity.CENTER_HORIZONTAL
-        );
-
-        wRow.addView(buttonW);
+        wRow.addView(createKeyButton(
+                "W",
+                android.view.KeyEvent.KEYCODE_W
+        ));
 
         root.addView(wRow);
 
-        LinearLayout asdRow =
-                new LinearLayout(this);
+        LinearLayout asdRow = new LinearLayout(this);
+        asdRow.setOrientation(LinearLayout.HORIZONTAL);
+        asdRow.setGravity(Gravity.CENTER_HORIZONTAL);
 
-        asdRow.setOrientation(
-                LinearLayout.HORIZONTAL
-        );
+        asdRow.addView(createKeyButton(
+                "A",
+                android.view.KeyEvent.KEYCODE_A
+        ));
 
-        asdRow.setGravity(
-                Gravity.CENTER_HORIZONTAL
-        );
+        asdRow.addView(createKeyButton(
+                "S",
+                android.view.KeyEvent.KEYCODE_S
+        ));
 
-        Button buttonA =
-                createKeyButton(
-                        "A",
-                        android.view.KeyEvent.KEYCODE_A
-                );
-
-        Button buttonS =
-                createKeyButton(
-                        "S",
-                        android.view.KeyEvent.KEYCODE_S
-                );
-
-        Button buttonD =
-                createKeyButton(
-                        "D",
-                        android.view.KeyEvent.KEYCODE_D
-                );
-
-        asdRow.addView(buttonA);
-        asdRow.addView(buttonS);
-        asdRow.addView(buttonD);
+        asdRow.addView(createKeyButton(
+                "D",
+                android.view.KeyEvent.KEYCODE_D
+        ));
 
         root.addView(asdRow);
 
-        TextView dragHint =
-                new TextView(this);
-
+        TextView dragHint = new TextView(this);
         dragHint.setText("⠿ drag");
         dragHint.setTextColor(Color.GRAY);
         dragHint.setTextSize(10);
         dragHint.setGravity(Gravity.CENTER);
-
         root.addView(dragHint);
 
-        root.setOnTouchListener(
-                new View.OnTouchListener() {
-
-                    @Override
-                    public boolean onTouch(
-                            View v,
-                            MotionEvent event
-                    ) {
-
-                        switch (event.getAction()) {
-
-                            case MotionEvent.ACTION_DOWN:
-
-                                initialX = params.x;
-                                initialY = params.y;
-
-                                initialTouchX =
-                                        (int) event.getRawX();
-
-                                initialTouchY =
-                                        (int) event.getRawY();
-
-                                return true;
-
-                            case MotionEvent.ACTION_MOVE:
-
-                                params.x =
-                                        (int) (
-                                                initialX
-                                                        + event.getRawX()
-                                                        - initialTouchX
-                                        );
-
-                                params.y =
-                                        (int) (
-                                                initialY
-                                                        + event.getRawY()
-                                                        - initialTouchY
-                                        );
-
-                                try {
-
-                                    windowManager.updateViewLayout(
-                                            overlayView,
-                                            params
-                                    );
-
-                                } catch (Exception e) {
-
-                                    Log.e(
-                                            TAG,
-                                            "Failed to move overlay",
-                                            e
-                                    );
-                                }
-
-                                return true;
-                        }
-
-                        return false;
-                    }
-                }
-        );
-
-        params =
-                new WindowManager.LayoutParams(
-                        WindowManager.LayoutParams.WRAP_CONTENT,
-                        WindowManager.LayoutParams.WRAP_CONTENT,
-                        getWindowType(),
-                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                                |
-                                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                                |
-                                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                        PixelFormat.TRANSLUCENT
-                );
-
-        params.gravity =
-                Gravity.BOTTOM |
-                        Gravity.START;
-
+        params = createWindowParams(Gravity.BOTTOM | Gravity.START);
         params.x = 24;
         params.y = 120;
 
         overlayView = root;
 
+        root.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    initialX = params.x;
+                    initialY = params.y;
+                    initialTouchX = (int) event.getRawX();
+                    initialTouchY = (int) event.getRawY();
+                    return true;
+
+                case MotionEvent.ACTION_MOVE:
+                    params.x = (int) (
+                            initialX + event.getRawX() - initialTouchX
+                    );
+
+                    params.y = (int) (
+                            initialY + event.getRawY() - initialTouchY
+                    );
+
+                    try {
+                        windowManager.updateViewLayout(overlayView, params);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to move WASD overlay", e);
+                    }
+                    return true;
+            }
+
+            return false;
+        });
+
         try {
-
-            windowManager.addView(
-                    overlayView,
-                    params
-            );
-
-            Log.i(
-                    TAG,
-                    "WASD overlay added"
-            );
-
+            windowManager.addView(overlayView, params);
         } catch (Exception e) {
-
-            Log.e(
-                    TAG,
-                    "Failed to add WASD overlay",
-                    e
-            );
-
+            Log.e(TAG, "Failed to add WASD overlay", e);
             overlayView = null;
         }
     }
 
-    private void showSpaceButton() {
-
-        if (spaceView != null) {
+    private void showNumberKeyboard() {
+        if (numberView != null) {
             return;
         }
 
-        Button buttonSpace =
-                createKeyButton(
-                        "SPACE",
-                        android.view.KeyEvent.KEYCODE_SPACE
-                );
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(8, 8, 8, 8);
 
-        spaceView = buttonSpace;
+        root.setBackground(createBackground(
+                Color.argb(220, 30, 30, 30),
+                Color.argb(180, 100, 180, 255)
+        ));
 
-        spaceParams =
-                new WindowManager.LayoutParams(
-                        WindowManager.LayoutParams.WRAP_CONTENT,
-                        WindowManager.LayoutParams.WRAP_CONTENT,
-                        getWindowType(),
-                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-                                |
-                                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
-                                |
-                                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                        PixelFormat.TRANSLUCENT
-                );
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
 
-        spaceParams.gravity =
-                Gravity.BOTTOM |
-                        Gravity.END;
+        TextView title = new TextView(this);
+        title.setText(" 1234567890 ");
+        title.setTextColor(Color.WHITE);
+        title.setTextSize(13);
+        titleRow.addView(title);
 
-        spaceParams.x = 24;
-        spaceParams.y = 120;
+        Button closeButton = new Button(this);
+        closeButton.setText("×");
+        closeButton.setTextColor(Color.WHITE);
+        closeButton.setMinWidth(40);
+        closeButton.setMinHeight(40);
 
-        buttonSpace.setOnTouchListener(
-                new View.OnTouchListener() {
+        closeButton.setOnClickListener(v -> {
+            removeNumberKeyboard();
+            numberKeyboardVisible = false;
+        });
 
-                    @Override
-                    public boolean onTouch(
-                            View v,
-                            MotionEvent event
-                    ) {
+        titleRow.addView(closeButton);
+        root.addView(titleRow);
 
-                        switch (event.getAction()) {
+        LinearLayout firstRow = new LinearLayout(this);
+        firstRow.setOrientation(LinearLayout.HORIZONTAL);
 
-                            case MotionEvent.ACTION_DOWN:
+        for (int number = 1; number <= 5; number++) {
+            firstRow.addView(createKeyButton(
+                    String.valueOf(number),
+                    getNumberKeyCode(number)
+            ));
+        }
 
-                                spaceInitialX =
-                                        spaceParams.x;
+        root.addView(firstRow);
 
-                                spaceInitialY =
-                                        spaceParams.y;
+        LinearLayout secondRow = new LinearLayout(this);
+        secondRow.setOrientation(LinearLayout.HORIZONTAL);
 
-                                spaceInitialTouchX =
-                                        (int) event.getRawX();
+        for (int number = 6; number <= 9; number++) {
+            secondRow.addView(createKeyButton(
+                    String.valueOf(number),
+                    getNumberKeyCode(number)
+            ));
+        }
 
-                                spaceInitialTouchY =
-                                        (int) event.getRawY();
+        secondRow.addView(createKeyButton(
+                "0",
+                android.view.KeyEvent.KEYCODE_0
+        ));
 
-                                GameInputIME.keyDown(
-                                        android.view.KeyEvent.KEYCODE_SPACE
-                                );
+        root.addView(secondRow);
 
-                                return true;
+        TextView dragHint = new TextView(this);
+        dragHint.setText("⠿ drag");
+        dragHint.setTextColor(Color.GRAY);
+        dragHint.setTextSize(10);
+        dragHint.setGravity(Gravity.CENTER);
+        root.addView(dragHint);
 
-                            case MotionEvent.ACTION_MOVE:
+        numberView = root;
 
-                                spaceParams.x =
-                                        (int) (
-                                                spaceInitialX
-                                                        - event.getRawX()
-                                                        + spaceInitialTouchX
-                                        );
+        numberParams = createWindowParams(Gravity.BOTTOM | Gravity.END);
+        numberParams.x = 24;
+        numberParams.y = 300;
 
-                                spaceParams.y =
-                                        (int) (
-                                                spaceInitialY
-                                                        - event.getRawY()
-                                                        + spaceInitialTouchY
-                                        );
+        root.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    numberInitialX = numberParams.x;
+                    numberInitialY = numberParams.y;
+                    numberInitialTouchX = (int) event.getRawX();
+                    numberInitialTouchY = (int) event.getRawY();
+                    return true;
 
-                                try {
+                case MotionEvent.ACTION_MOVE:
+                    numberParams.x = (int) (
+                            numberInitialX - event.getRawX()
+                                    + numberInitialTouchX
+                    );
 
-                                    windowManager.updateViewLayout(
-                                            spaceView,
-                                            spaceParams
-                                    );
+                    numberParams.y = (int) (
+                            numberInitialY - event.getRawY()
+                                    + numberInitialTouchY
+                    );
 
-                                } catch (Exception e) {
-
-                                    Log.e(
-                                            TAG,
-                                            "Failed to move SPACE",
-                                            e
-                                    );
-                                }
-
-                                return true;
-
-                            case MotionEvent.ACTION_UP:
-
-                            case MotionEvent.ACTION_CANCEL:
-
-                                GameInputIME.keyUp(
-                                        android.view.KeyEvent.KEYCODE_SPACE
-                                );
-
-                                return true;
-                        }
-
-                        return true;
+                    try {
+                        windowManager.updateViewLayout(
+                                numberView,
+                                numberParams
+                        );
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to move number keyboard", e);
                     }
-                }
-        );
+                    return true;
+            }
+
+            return false;
+        });
 
         try {
-
-            windowManager.addView(
-                    spaceView,
-                    spaceParams
-            );
-
-            Log.i(
-                    TAG,
-                    "SPACE button added"
-            );
-
+            windowManager.addView(numberView, numberParams);
         } catch (Exception e) {
-
-            Log.e(
-                    TAG,
-                    "Failed to add SPACE button",
-                    e
-            );
-
-            spaceView = null;
+            Log.e(TAG, "Failed to add number keyboard", e);
+            numberView = null;
         }
     }
 
-    private Button createKeyButton(
-            String text,
-            int keyCode
-    ) {
+    private int getNumberKeyCode(int number) {
+        switch (number) {
+            case 1: return android.view.KeyEvent.KEYCODE_1;
+            case 2: return android.view.KeyEvent.KEYCODE_2;
+            case 3: return android.view.KeyEvent.KEYCODE_3;
+            case 4: return android.view.KeyEvent.KEYCODE_4;
+            case 5: return android.view.KeyEvent.KEYCODE_5;
+            case 6: return android.view.KeyEvent.KEYCODE_6;
+            case 7: return android.view.KeyEvent.KEYCODE_7;
+            case 8: return android.view.KeyEvent.KEYCODE_8;
+            case 9: return android.view.KeyEvent.KEYCODE_9;
+            default: return android.view.KeyEvent.KEYCODE_0;
+        }
+    }
 
-        Button button =
-                new Button(this);
+    private Button createKeyButton(String text, int keyCode) {
+        Button button = new Button(this);
 
         button.setText(text);
         button.setTextSize(16);
         button.setTextColor(Color.WHITE);
-
         button.setMinWidth(72);
         button.setMinHeight(72);
+        button.setPadding(8, 8, 8, 8);
 
-        button.setPadding(
-                8,
-                8,
-                8,
-                8
-        );
+        button.setBackground(createBackground(
+                Color.argb(220, 50, 50, 70),
+                Color.argb(200, 80, 160, 255)
+        ));
 
-        GradientDrawable background =
-                new GradientDrawable();
-
-        background.setColor(
-                Color.argb(
-                        220,
-                        50,
-                        50,
-                        70
-                )
-        );
-
-        background.setCornerRadius(12);
-
-        background.setStroke(
-                2,
-                Color.argb(
-                        200,
-                        80,
-                        160,
-                        255
-                )
-        );
-
-        button.setBackground(background);
-
-        button.setOnTouchListener(
-                (v, event) -> {
-
-                    switch (event.getAction()) {
-
-                        case MotionEvent.ACTION_DOWN:
-
-                            GameInputIME.keyDown(
-                                    keyCode
-                            );
-
-                            return true;
-
-                        case MotionEvent.ACTION_UP:
-
-                        case MotionEvent.ACTION_CANCEL:
-
-                            GameInputIME.keyUp(
-                                    keyCode
-                            );
-
-                            return true;
-                    }
-
+        button.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    GameInputIME.keyDown(keyCode);
                     return true;
-                }
-        );
+
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    GameInputIME.keyUp(keyCode);
+                    return true;
+            }
+
+            return true;
+        });
 
         return button;
     }
 
     private void showAppMenu(View anchor) {
+        PopupMenu menu = new PopupMenu(this, anchor);
 
-        PopupMenu menu =
-                new PopupMenu(
-                        this,
-                        anchor
+        menu.getMenu().add(0, 0, 0, "Open app list");
+        menu.getMenu().add(0, 1, 1, "Open Charge Controller");
+        menu.getMenu().add(0, 2, 2, "Number Keyboard");
+
+        menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 0) {
+                Intent intent = new Intent(this, MainActivity.class);
+                intent.addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+                                | Intent.FLAG_ACTIVITY_SINGLE_TOP
                 );
+                startActivity(intent);
 
-        menu.getMenu().add(
-                0,
-                0,
-                0,
-                "Open app list"
-        );
+            } else if (item.getItemId() == 1) {
+                Intent intent = new Intent(this, MainActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
 
-        menu.getMenu().add(
-                0,
-                1,
-                1,
-                "Open Charge Controller"
-        );
-
-        menu.setOnMenuItemClickListener(
-                item -> {
-
-                    if (item.getItemId() == 0) {
-
-                        Intent intent =
-                                new Intent(
-                                        this,
-                                        MainActivity.class
-                                );
-
-                        intent.addFlags(
-                                Intent.FLAG_ACTIVITY_NEW_TASK
-                                        |
-                                        Intent.FLAG_ACTIVITY_SINGLE_TOP
-                        );
-
-                        startActivity(intent);
-
-                    } else if (
-                            item.getItemId() == 1
-                    ) {
-
-                        Intent intent =
-                                new Intent(
-                                        this,
-                                        MainActivity.class
-                                );
-
-                        intent.addFlags(
-                                Intent.FLAG_ACTIVITY_NEW_TASK
-                        );
-
-                        startActivity(intent);
-                    }
-
-                    return true;
+            } else if (item.getItemId() == 2) {
+                if (numberKeyboardVisible) {
+                    removeNumberKeyboard();
+                    numberKeyboardVisible = false;
+                } else {
+                    showNumberKeyboard();
+                    numberKeyboardVisible = numberView != null;
                 }
-        );
+            }
+
+            return true;
+        });
 
         menu.show();
     }
 
     private void removeOverlay() {
-
-        if (overlayView != null &&
-                windowManager != null) {
-
+        if (overlayView != null && windowManager != null) {
             try {
-
-                windowManager.removeView(
-                        overlayView
-                );
-
+                windowManager.removeView(overlayView);
             } catch (Exception e) {
-
-                Log.w(
-                        TAG,
-                        "Error removing WASD overlay",
-                        e
-                );
+                Log.w(TAG, "Error removing WASD overlay", e);
             }
 
             overlayView = null;
         }
     }
 
-    private void removeSpaceButton() {
-
-        if (spaceView != null &&
-                windowManager != null) {
-
+    private void removeNumberKeyboard() {
+        if (numberView != null && windowManager != null) {
             try {
-
-                windowManager.removeView(
-                        spaceView
-                );
-
+                windowManager.removeView(numberView);
             } catch (Exception e) {
-
-                Log.w(
-                        TAG,
-                        "Error removing SPACE button",
-                        e
-                );
+                Log.w(TAG, "Error removing number keyboard", e);
             }
 
-            spaceView = null;
+            numberView = null;
         }
     }
-    }
+}
