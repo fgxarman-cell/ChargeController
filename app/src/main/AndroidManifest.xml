@@ -1,54 +1,48 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-
-    <application
-        android:allowBackup="true"
-        android:label="Charge Controller"
-        android:supportsRtl="true"
-        android:theme="@android:style/Theme.Material.Light.NoActionBar">
-
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
-
-        <service
-            android:name=".OverlayService"
-            android:exported="false" />
-
-        <service
-            android:name=".MyAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
-
-        <service
-            android:name=".GameInputIME"
-            android:label="Charge Controller Keyboard"
-            android:permission="android.permission.BIND_INPUT_METHOD"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.view.InputMethod" />
-            </intent-filter>
-            <meta-data
-                android:name="android.view.im"
-                android:resource="@xml/input_method" />
-        </service>
-
-    </application>
-
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:compileSdkVersion="35" android:compileSdkVersionCodename="15" android:versionCode="1" android:versionName="1.0" package="com.armancraft.chargecontroller" platformBuildVersionCode="35" platformBuildVersionName="15">
+	<uses-sdk android:minSdkVersion="23" android:targetSdkVersion="30" />
+	<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+	<permission android:name="com.armancraft.chargecontroller.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" android:protectionLevel="signature" />
+	<uses-permission android:name="com.armancraft.chargecontroller.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+	<application android:allowBackup="true" android:appComponentFactory="androidx.core.app.CoreComponentFactory" android:debuggable="true" android:extractNativeLibs="false" android:label="Charge Controller" android:supportsRtl="true" android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+		<activity android:exported="true" android:name="com.armancraft.chargecontroller.MainActivity">
+			<intent-filter>
+				<action android:name="android.intent.action.MAIN" />
+				<category android:name="android.intent.category.LAUNCHER" />
+			</intent-filter>
+		</activity>
+		<service android:exported="false" android:name="com.armancraft.chargecontroller.OverlayService" />
+		<service android:exported="true" android:name="com.armancraft.chargecontroller.MyAccessibilityService" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+			<intent-filter>
+				<action android:name="android.accessibilityservice.AccessibilityService" />
+			</intent-filter>
+			<meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service_config" />
+		</service>
+		<service android:exported="true" android:label="Charge Controller Keyboard" android:name="com.armancraft.chargecontroller.GameInputIME" android:permission="android.permission.BIND_INPUT_METHOD">
+			<intent-filter>
+				<action android:name="android.view.InputMethod" />
+			</intent-filter>
+			<meta-data android:name="android.view.im" android:resource="@xml/input_method" />
+		</service>
+		<provider android:authorities="com.armancraft.chargecontroller.androidx-startup" android:exported="false" android:name="androidx.startup.InitializationProvider">
+			<meta-data android:name="androidx.emoji2.text.EmojiCompatInitializer" android:value="androidx.startup" />
+			<meta-data android:name="androidx.lifecycle.ProcessLifecycleInitializer" android:value="androidx.startup" />
+			<meta-data android:name="androidx.profileinstaller.ProfileInstallerInitializer" android:value="androidx.startup" />
+		</provider>
+		<receiver android:directBootAware="false" android:enabled="true" android:exported="true" android:name="androidx.profileinstaller.ProfileInstallReceiver" android:permission="android.permission.DUMP">
+			<intent-filter>
+				<action android:name="androidx.profileinstaller.action.INSTALL_PROFILE" />
+			</intent-filter>
+			<intent-filter>
+				<action android:name="androidx.profileinstaller.action.SKIP_FILE" />
+			</intent-filter>
+			<intent-filter>
+				<action android:name="androidx.profileinstaller.action.SAVE_PROFILE" />
+			</intent-filter>
+			<intent-filter>
+				<action android:name="androidx.profileinstaller.action.BENCHMARK_OPERATION" />
+			</intent-filter>
+		</receiver>
+	</application>
 </manifest>
