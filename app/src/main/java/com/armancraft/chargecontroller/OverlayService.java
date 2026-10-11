@@ -41,6 +41,9 @@ public class OverlayService extends Service {
     private View numberView;
     private WindowManager.LayoutParams numberParams;
 
+    private View zeroView;
+    private WindowManager.LayoutParams zeroParams;
+
     private boolean numberKeyboardVisible = false;
 
     private float initialX;
@@ -57,6 +60,11 @@ public class OverlayService extends Service {
     private float numberInitialY;
     private int numberInitialTouchX;
     private int numberInitialTouchY;
+
+    private float zeroInitialX;
+    private float zeroInitialY;
+    private int zeroInitialTouchX;
+    private int zeroInitialTouchY;
 
     @Override
     public void onCreate() {
@@ -91,6 +99,7 @@ public class OverlayService extends Service {
         removeOverlay();
         removeSpaceButton();
         removeNumberKeyboard();
+        removeZeroButton();
         super.onDestroy();
     }
 
@@ -207,14 +216,12 @@ public class OverlayService extends Service {
 
         root.addView(topRow);
 
-        Button buttonW = createKeyButton(
-                "W",
-                android.view.KeyEvent.KEYCODE_W
-        );
-
         LinearLayout wRow = new LinearLayout(this);
         wRow.setGravity(Gravity.CENTER_HORIZONTAL);
-        wRow.addView(buttonW);
+        wRow.addView(createKeyButton(
+                "W",
+                android.view.KeyEvent.KEYCODE_W
+        ));
         root.addView(wRow);
 
         LinearLayout asdRow = new LinearLayout(this);
@@ -387,7 +394,7 @@ public class OverlayService extends Service {
         titleRow.addView(menuButton);
 
         TextView title = new TextView(this);
-        title.setText(" 1234567890 ");
+        title.setText(" NUMBER KEYS ");
         title.setTextColor(Color.WHITE);
         title.setTextSize(13);
         titleRow.addView(title);
@@ -399,7 +406,10 @@ public class OverlayService extends Service {
         closeButton.setMinHeight(40);
         closeButton.setOnClickListener(v -> {
             removeNumberKeyboard();
+            removeZeroButton();
             numberKeyboardVisible = false;
+            showOverlay();
+            showSpaceButton();
         });
         titleRow.addView(closeButton);
 
@@ -426,11 +436,6 @@ public class OverlayService extends Service {
                     getNumberKeyCode(number)
             ));
         }
-
-        secondRow.addView(createKeyButton(
-                "0",
-                android.view.KeyEvent.KEYCODE_0
-        ));
 
         root.addView(secondRow);
 
@@ -480,9 +485,76 @@ public class OverlayService extends Service {
 
         try {
             windowManager.addView(numberView, numberParams);
+            showZeroButton();
         } catch (Exception e) {
             Log.e(TAG, "Failed to add number keyboard", e);
             numberView = null;
+        }
+    }
+
+    private void showZeroButton() {
+        if (zeroView != null) {
+            return;
+        }
+
+        Button buttonZero = createKeyButton(
+                "0",
+                android.view.KeyEvent.KEYCODE_0
+        );
+
+        zeroView = buttonZero;
+
+        zeroParams = createWindowParams(Gravity.BOTTOM | Gravity.END);
+        zeroParams.x = 24;
+        zeroParams.y = 120;
+
+        buttonZero.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    zeroInitialX = zeroParams.x;
+                    zeroInitialY = zeroParams.y;
+                    zeroInitialTouchX = (int) event.getRawX();
+                    zeroInitialTouchY = (int) event.getRawY();
+
+                    GameInputIME.keyDown(
+                            android.view.KeyEvent.KEYCODE_0
+                    );
+                    return true;
+
+                case MotionEvent.ACTION_MOVE:
+                    zeroParams.x = (int) (
+                            zeroInitialX - event.getRawX()
+                                    + zeroInitialTouchX
+                    );
+
+                    zeroParams.y = (int) (
+                            zeroInitialY - event.getRawY()
+                                    + zeroInitialTouchY
+                    );
+
+                    try {
+                        windowManager.updateViewLayout(zeroView, zeroParams);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to move zero button", e);
+                    }
+                    return true;
+
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    GameInputIME.keyUp(
+                            android.view.KeyEvent.KEYCODE_0
+                    );
+                    return true;
+            }
+
+            return true;
+        });
+
+        try {
+            windowManager.addView(zeroView, zeroParams);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to add zero button", e);
+            zeroView = null;
         }
     }
 
@@ -494,6 +566,7 @@ public class OverlayService extends Service {
         menu.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == 1) {
                 removeNumberKeyboard();
+                removeZeroButton();
                 numberKeyboardVisible = false;
 
                 showOverlay();
@@ -579,6 +652,7 @@ public class OverlayService extends Service {
             } else if (item.getItemId() == 2) {
                 if (numberKeyboardVisible) {
                     removeNumberKeyboard();
+                    removeZeroButton();
                     numberKeyboardVisible = false;
 
                     showOverlay();
@@ -619,6 +693,18 @@ public class OverlayService extends Service {
         }
     }
 
+    private void removeZeroButton() {
+        if (zeroView != null && windowManager != null) {
+            try {
+                windowManager.removeView(zeroView);
+            } catch (Exception e) {
+                Log.w(TAG, "Error removing zero button", e);
+            }
+
+            zeroView = null;
+        }
+    }
+
     private void removeNumberKeyboard() {
         if (numberView != null && windowManager != null) {
             try {
@@ -630,4 +716,4 @@ public class OverlayService extends Service {
             numberView = null;
         }
     }
-            }
+        }
