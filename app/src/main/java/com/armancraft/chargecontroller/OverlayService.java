@@ -496,4 +496,4 @@ public class OverlayService extends Service {
 
         numberKeyboardVisible = false;
     }
-                              }
+            }
