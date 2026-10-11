@@ -35,20 +35,28 @@ public class OverlayService extends Service {
     private View overlayView;
     private WindowManager.LayoutParams params;
 
+    private View spaceView;
+    private WindowManager.LayoutParams spaceParams;
+
     private View numberView;
     private WindowManager.LayoutParams numberParams;
+
+    private boolean numberKeyboardVisible = false;
 
     private float initialX;
     private float initialY;
     private int initialTouchX;
     private int initialTouchY;
 
+    private float spaceInitialX;
+    private float spaceInitialY;
+    private int spaceInitialTouchX;
+    private int spaceInitialTouchY;
+
     private float numberInitialX;
     private float numberInitialY;
     private int numberInitialTouchX;
     private int numberInitialTouchY;
-
-    private boolean numberKeyboardVisible = false;
 
     @Override
     public void onCreate() {
@@ -60,6 +68,7 @@ public class OverlayService extends Service {
         startForeground(NOTIFICATION_ID, buildNotification());
 
         showOverlay();
+        showSpaceButton();
     }
 
     @Override
@@ -67,12 +76,18 @@ public class OverlayService extends Service {
         if (overlayView == null) {
             showOverlay();
         }
+
+        if (spaceView == null) {
+            showSpaceButton();
+        }
+
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
         removeOverlay();
+        removeSpaceButton();
         removeNumberKeyboard();
         super.onDestroy();
     }
@@ -129,15 +144,7 @@ public class OverlayService extends Service {
         return WindowManager.LayoutParams.TYPE_PHONE;
     }
 
-    private GradientDrawable makeBackground(int color, int stroke) {
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(color);
-        background.setCornerRadius(18);
-        background.setStroke(2, stroke);
-        return background;
-    }
-
-    private WindowManager.LayoutParams makeParams(int gravity) {
+    private WindowManager.LayoutParams createWindowParams(int gravity) {
         WindowManager.LayoutParams result =
                 new WindowManager.LayoutParams(
                         WindowManager.LayoutParams.WRAP_CONTENT,
@@ -156,7 +163,6 @@ public class OverlayService extends Service {
     private void showOverlay() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                 && !Settings.canDrawOverlays(this)) {
-            Log.w(TAG, "Overlay permission not granted");
             stopSelf();
             return;
         }
@@ -168,10 +174,12 @@ public class OverlayService extends Service {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(8, 8, 8, 8);
-        root.setBackground(makeBackground(
-                Color.argb(210, 30, 30, 30),
-                Color.argb(180, 100, 180, 255)
-        ));
+
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.argb(210, 30, 30, 30));
+        background.setCornerRadius(18);
+        background.setStroke(2, Color.argb(180, 100, 180, 255));
+        root.setBackground(background);
 
         LinearLayout topRow = new LinearLayout(this);
         topRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -186,7 +194,6 @@ public class OverlayService extends Service {
         menuButton.setPadding(12, 4, 12, 4);
         menuButton.setBackgroundColor(Color.TRANSPARENT);
         menuButton.setOnClickListener(v -> showAppMenu(v));
-
         topRow.addView(menuButton);
 
         TextView title = new TextView(this);
@@ -198,12 +205,14 @@ public class OverlayService extends Service {
 
         root.addView(topRow);
 
-        LinearLayout wRow = new LinearLayout(this);
-        wRow.setGravity(Gravity.CENTER_HORIZONTAL);
-        wRow.addView(createKeyButton(
+        Button buttonW = createKeyButton(
                 "W",
                 android.view.KeyEvent.KEYCODE_W
-        ));
+        );
+
+        LinearLayout wRow = new LinearLayout(this);
+        wRow.setGravity(Gravity.CENTER_HORIZONTAL);
+        wRow.addView(buttonW);
         root.addView(wRow);
 
         LinearLayout asdRow = new LinearLayout(this);
@@ -214,10 +223,12 @@ public class OverlayService extends Service {
                 "A",
                 android.view.KeyEvent.KEYCODE_A
         ));
+
         asdRow.addView(createKeyButton(
                 "S",
                 android.view.KeyEvent.KEYCODE_S
         ));
+
         asdRow.addView(createKeyButton(
                 "D",
                 android.view.KeyEvent.KEYCODE_D
@@ -232,26 +243,6 @@ public class OverlayService extends Service {
         dragHint.setGravity(Gravity.CENTER);
         root.addView(dragHint);
 
-        Button numberButton = new Button(this);
-        numberButton.setText("123");
-        numberButton.setTextColor(Color.WHITE);
-        numberButton.setTextSize(14);
-        numberButton.setMinHeight(48);
-        numberButton.setOnClickListener(v -> {
-            if (numberKeyboardVisible) {
-                removeNumberKeyboard();
-            } else {
-                showNumberKeyboard();
-            }
-        });
-        root.addView(numberButton);
-
-        params = makeParams(Gravity.BOTTOM | Gravity.START);
-        params.x = 24;
-        params.y = 120;
-
-        overlayView = root;
-
         root.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
@@ -265,6 +256,7 @@ public class OverlayService extends Service {
                     params.x = (int) (
                             initialX + event.getRawX() - initialTouchX
                     );
+
                     params.y = (int) (
                             initialY + event.getRawY() - initialTouchY
                     );
@@ -272,19 +264,91 @@ public class OverlayService extends Service {
                     try {
                         windowManager.updateViewLayout(overlayView, params);
                     } catch (Exception e) {
-                        Log.e(TAG, "Failed to move overlay", e);
+                        Log.e(TAG, "Failed to move WASD overlay", e);
                     }
                     return true;
             }
+
             return false;
         });
 
+        params = createWindowParams(Gravity.BOTTOM | Gravity.START);
+        params.x = 24;
+        params.y = 120;
+
+        overlayView = root;
+
         try {
             windowManager.addView(overlayView, params);
-            Log.i(TAG, "WASD overlay added");
         } catch (Exception e) {
             Log.e(TAG, "Failed to add WASD overlay", e);
             overlayView = null;
+        }
+    }
+
+    private void showSpaceButton() {
+        if (spaceView != null) {
+            return;
+        }
+
+        Button buttonSpace = createKeyButton(
+                "SPACE",
+                android.view.KeyEvent.KEYCODE_SPACE
+        );
+
+        spaceView = buttonSpace;
+
+        spaceParams = createWindowParams(Gravity.BOTTOM | Gravity.END);
+        spaceParams.x = 24;
+        spaceParams.y = 120;
+
+        buttonSpace.setOnTouchListener((v, event) -> {
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    spaceInitialX = spaceParams.x;
+                    spaceInitialY = spaceParams.y;
+                    spaceInitialTouchX = (int) event.getRawX();
+                    spaceInitialTouchY = (int) event.getRawY();
+
+                    GameInputIME.keyDown(
+                            android.view.KeyEvent.KEYCODE_SPACE
+                    );
+                    return true;
+
+                case MotionEvent.ACTION_MOVE:
+                    spaceParams.x = (int) (
+                            spaceInitialX - event.getRawX()
+                                    + spaceInitialTouchX
+                    );
+
+                    spaceParams.y = (int) (
+                            spaceInitialY - event.getRawY()
+                                    + spaceInitialTouchY
+                    );
+
+                    try {
+                        windowManager.updateViewLayout(spaceView, spaceParams);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Failed to move SPACE", e);
+                    }
+                    return true;
+
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    GameInputIME.keyUp(
+                            android.view.KeyEvent.KEYCODE_SPACE
+                    );
+                    return true;
+            }
+
+            return true;
+        });
+
+        try {
+            windowManager.addView(spaceView, spaceParams);
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to add SPACE button", e);
+            spaceView = null;
         }
     }
 
@@ -296,35 +360,42 @@ public class OverlayService extends Service {
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(8, 8, 8, 8);
-        root.setBackground(makeBackground(
-                Color.argb(220, 30, 30, 30),
-                Color.argb(180, 100, 180, 255)
-        ));
+
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.argb(220, 30, 30, 30));
+        background.setCornerRadius(16);
+        background.setStroke(2, Color.argb(180, 100, 180, 255));
+        root.setBackground(background);
 
         LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView title = new TextView(this);
-        title.setText(" Numbers ");
+        title.setText(" 1234567890 ");
         title.setTextColor(Color.WHITE);
         title.setTextSize(13);
         titleRow.addView(title);
 
         Button closeButton = new Button(this);
-        closeButton.setText("X");
+        closeButton.setText("×");
         closeButton.setTextColor(Color.WHITE);
-        closeButton.setOnClickListener(v -> removeNumberKeyboard());
+        closeButton.setMinWidth(40);
+        closeButton.setMinHeight(40);
+        closeButton.setOnClickListener(v -> {
+            removeNumberKeyboard();
+            numberKeyboardVisible = false;
+        });
         titleRow.addView(closeButton);
-
         root.addView(titleRow);
 
         LinearLayout firstRow = new LinearLayout(this);
         firstRow.setOrientation(LinearLayout.HORIZONTAL);
 
-        for (int n = 1; n <= 5; n++) {
+        for (int number = 1; number <= 5; number++) {
             firstRow.addView(createKeyButton(
-                    String.valueOf(n),
-                    getNumberKeyCode(n)
+                    String.valueOf(number),
+                    getNumberKeyCode(number)
             ));
         }
 
@@ -333,10 +404,10 @@ public class OverlayService extends Service {
         LinearLayout secondRow = new LinearLayout(this);
         secondRow.setOrientation(LinearLayout.HORIZONTAL);
 
-        for (int n = 6; n <= 9; n++) {
+        for (int number = 6; number <= 9; number++) {
             secondRow.addView(createKeyButton(
-                    String.valueOf(n),
-                    getNumberKeyCode(n)
+                    String.valueOf(number),
+                    getNumberKeyCode(number)
             ));
         }
 
@@ -348,18 +419,19 @@ public class OverlayService extends Service {
         root.addView(secondRow);
 
         TextView dragHint = new TextView(this);
-        dragHint.setText("Hold here to drag");
+        dragHint.setText("⠿ drag");
         dragHint.setTextColor(Color.GRAY);
         dragHint.setTextSize(10);
         dragHint.setGravity(Gravity.CENTER);
         root.addView(dragHint);
 
         numberView = root;
-        numberParams = makeParams(Gravity.BOTTOM | Gravity.END);
+
+        numberParams = createWindowParams(Gravity.BOTTOM | Gravity.END);
         numberParams.x = 24;
         numberParams.y = 300;
 
-        dragHint.setOnTouchListener((v, event) -> {
+        root.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
                     numberInitialX = numberParams.x;
@@ -373,35 +445,28 @@ public class OverlayService extends Service {
                             numberInitialX - event.getRawX()
                                     + numberInitialTouchX
                     );
+
                     numberParams.y = (int) (
                             numberInitialY - event.getRawY()
                                     + numberInitialTouchY
                     );
 
                     try {
-                        windowManager.updateViewLayout(
-                                numberView,
-                                numberParams
-                        );
+                        windowManager.updateViewLayout(numberView, numberParams);
                     } catch (Exception e) {
                         Log.e(TAG, "Failed to move number keyboard", e);
                     }
                     return true;
-
-                case MotionEvent.ACTION_UP:
-                case MotionEvent.ACTION_CANCEL:
-                    return true;
             }
-            return true;
+
+            return false;
         });
 
         try {
             windowManager.addView(numberView, numberParams);
-            numberKeyboardVisible = true;
         } catch (Exception e) {
             Log.e(TAG, "Failed to add number keyboard", e);
             numberView = null;
-            numberKeyboardVisible = false;
         }
     }
 
@@ -422,16 +487,19 @@ public class OverlayService extends Service {
 
     private Button createKeyButton(String text, int keyCode) {
         Button button = new Button(this);
+
         button.setText(text);
         button.setTextSize(16);
         button.setTextColor(Color.WHITE);
         button.setMinWidth(72);
         button.setMinHeight(72);
         button.setPadding(8, 8, 8, 8);
-        button.setBackground(makeBackground(
-                Color.argb(220, 50, 50, 70),
-                Color.argb(200, 80, 160, 255)
-        ));
+
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.argb(220, 50, 50, 70));
+        background.setCornerRadius(12);
+        background.setStroke(2, Color.argb(200, 80, 160, 255));
+        button.setBackground(background);
 
         button.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
@@ -444,6 +512,7 @@ public class OverlayService extends Service {
                     GameInputIME.keyUp(keyCode);
                     return true;
             }
+
             return true;
         });
 
@@ -455,18 +524,32 @@ public class OverlayService extends Service {
 
         menu.getMenu().add(0, 0, 0, "Open app list");
         menu.getMenu().add(0, 1, 1, "Open Charge Controller");
+        menu.getMenu().add(0, 2, 2, "Number Keyboard");
 
         menu.setOnMenuItemClickListener(item -> {
-            if (item.getItemId() == 0 || item.getItemId() == 1) {
+            if (item.getItemId() == 0) {
+                Intent intent = new Intent(this, MainActivity.class);
+                intent.addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK
+                                | Intent.FLAG_ACTIVITY_SINGLE_TOP
+                );
+                startActivity(intent);
+
+            } else if (item.getItemId() == 1) {
                 Intent intent = new Intent(this, MainActivity.class);
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-
-                if (item.getItemId() == 0) {
-                    intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                }
-
                 startActivity(intent);
+
+            } else if (item.getItemId() == 2) {
+                if (numberKeyboardVisible) {
+                    removeNumberKeyboard();
+                    numberKeyboardVisible = false;
+                } else {
+                    showNumberKeyboard();
+                    numberKeyboardVisible = numberView != null;
+                }
             }
+
             return true;
         });
 
@@ -480,7 +563,20 @@ public class OverlayService extends Service {
             } catch (Exception e) {
                 Log.w(TAG, "Error removing WASD overlay", e);
             }
+
             overlayView = null;
+        }
+    }
+
+    private void removeSpaceButton() {
+        if (spaceView != null && windowManager != null) {
+            try {
+                windowManager.removeView(spaceView);
+            } catch (Exception e) {
+                Log.w(TAG, "Error removing SPACE button", e);
+            }
+
+            spaceView = null;
         }
     }
 
@@ -491,9 +587,8 @@ public class OverlayService extends Service {
             } catch (Exception e) {
                 Log.w(TAG, "Error removing number keyboard", e);
             }
+
             numberView = null;
         }
-
-        numberKeyboardVisible = false;
     }
             }
