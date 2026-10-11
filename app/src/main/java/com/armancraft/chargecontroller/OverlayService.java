@@ -37,7 +37,6 @@ public class OverlayService extends Service {
 
     private View numberView;
     private WindowManager.LayoutParams numberParams;
-
     private boolean numberKeyboardVisible = false;
 
     private float initialX;
@@ -57,6 +56,7 @@ public class OverlayService extends Service {
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
         createNotificationChannel();
+
         startForeground(NOTIFICATION_ID, buildNotification());
 
         showOverlay();
@@ -130,6 +130,17 @@ public class OverlayService extends Service {
         return WindowManager.LayoutParams.TYPE_PHONE;
     }
 
+    private GradientDrawable createBackground(
+            int color,
+            int strokeColor
+    ) {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(color);
+        background.setCornerRadius(18);
+        background.setStroke(2, strokeColor);
+        return background;
+    }
+
     private WindowManager.LayoutParams createWindowParams(int gravity) {
         WindowManager.LayoutParams result =
                 new WindowManager.LayoutParams(
@@ -146,20 +157,10 @@ public class OverlayService extends Service {
         return result;
     }
 
-    private GradientDrawable createBackground(
-            int color,
-            int strokeColor
-    ) {
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(color);
-        background.setCornerRadius(16);
-        background.setStroke(2, strokeColor);
-        return background;
-    }
-
     private void showOverlay() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                 && !Settings.canDrawOverlays(this)) {
+            Log.w(TAG, "Overlay permission not granted");
             stopSelf();
             return;
         }
@@ -198,8 +199,8 @@ public class OverlayService extends Service {
         title.setTextColor(Color.LTGRAY);
         title.setTextSize(11);
         title.setPadding(4, 8, 4, 0);
-        topRow.addView(title);
 
+        topRow.addView(title);
         root.addView(topRow);
 
         LinearLayout wRow = new LinearLayout(this);
@@ -238,6 +239,7 @@ public class OverlayService extends Service {
         dragHint.setTextColor(Color.GRAY);
         dragHint.setTextSize(10);
         dragHint.setGravity(Gravity.CENTER);
+
         root.addView(dragHint);
 
         params = createWindowParams(Gravity.BOTTOM | Gravity.START);
@@ -267,8 +269,9 @@ public class OverlayService extends Service {
                     try {
                         windowManager.updateViewLayout(overlayView, params);
                     } catch (Exception e) {
-                        Log.e(TAG, "Failed to move WASD overlay", e);
+                        Log.e(TAG, "Failed to move overlay", e);
                     }
+
                     return true;
             }
 
@@ -277,6 +280,7 @@ public class OverlayService extends Service {
 
         try {
             windowManager.addView(overlayView, params);
+            Log.i(TAG, "WASD overlay added");
         } catch (Exception e) {
             Log.e(TAG, "Failed to add WASD overlay", e);
             overlayView = null;
@@ -293,33 +297,33 @@ public class OverlayService extends Service {
         root.setPadding(8, 8, 8, 8);
 
         root.setBackground(createBackground(
-                Color.argb(220, 30, 30, 30),
+                Color.argb(210, 30, 30, 30),
                 Color.argb(180, 100, 180, 255)
         ));
 
-        LinearLayout titleRow = new LinearLayout(this);
-        titleRow.setOrientation(LinearLayout.HORIZONTAL);
-        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
 
         TextView title = new TextView(this);
-        title.setText(" 1234567890 ");
-        title.setTextColor(Color.WHITE);
-        title.setTextSize(13);
-        titleRow.addView(title);
+        title.setText(" Number Keys ");
+        title.setTextColor(Color.LTGRAY);
+        title.setTextSize(12);
+
+        topRow.addView(title);
 
         Button closeButton = new Button(this);
-        closeButton.setText("×");
+        closeButton.setText("X");
         closeButton.setTextColor(Color.WHITE);
-        closeButton.setMinWidth(40);
-        closeButton.setMinHeight(40);
-
+        closeButton.setMinWidth(48);
+        closeButton.setMinHeight(48);
         closeButton.setOnClickListener(v -> {
             removeNumberKeyboard();
             numberKeyboardVisible = false;
         });
 
-        titleRow.addView(closeButton);
-        root.addView(titleRow);
+        topRow.addView(closeButton);
+        root.addView(topRow);
 
         LinearLayout firstRow = new LinearLayout(this);
         firstRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -363,7 +367,7 @@ public class OverlayService extends Service {
         numberParams.x = 24;
         numberParams.y = 300;
 
-        root.setOnTouchListener((v, event) -> {
+        dragHint.setOnTouchListener((v, event) -> {
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
                     numberInitialX = numberParams.x;
@@ -374,12 +378,14 @@ public class OverlayService extends Service {
 
                 case MotionEvent.ACTION_MOVE:
                     numberParams.x = (int) (
-                            numberInitialX - event.getRawX()
+                            numberInitialX
+                                    - event.getRawX()
                                     + numberInitialTouchX
                     );
 
                     numberParams.y = (int) (
-                            numberInitialY - event.getRawY()
+                            numberInitialY
+                                    - event.getRawY()
                                     + numberInitialTouchY
                     );
 
@@ -391,32 +397,50 @@ public class OverlayService extends Service {
                     } catch (Exception e) {
                         Log.e(TAG, "Failed to move number keyboard", e);
                     }
+
+                    return true;
+
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
                     return true;
             }
 
-            return false;
+            return true;
         });
 
         try {
             windowManager.addView(numberView, numberParams);
+            numberKeyboardVisible = true;
+            Log.i(TAG, "Number keyboard added");
         } catch (Exception e) {
             Log.e(TAG, "Failed to add number keyboard", e);
             numberView = null;
+            numberKeyboardVisible = false;
         }
     }
 
     private int getNumberKeyCode(int number) {
         switch (number) {
-            case 1: return android.view.KeyEvent.KEYCODE_1;
-            case 2: return android.view.KeyEvent.KEYCODE_2;
-            case 3: return android.view.KeyEvent.KEYCODE_3;
-            case 4: return android.view.KeyEvent.KEYCODE_4;
-            case 5: return android.view.KeyEvent.KEYCODE_5;
-            case 6: return android.view.KeyEvent.KEYCODE_6;
-            case 7: return android.view.KeyEvent.KEYCODE_7;
-            case 8: return android.view.KeyEvent.KEYCODE_8;
-            case 9: return android.view.KeyEvent.KEYCODE_9;
-            default: return android.view.KeyEvent.KEYCODE_0;
+            case 1:
+                return android.view.KeyEvent.KEYCODE_1;
+            case 2:
+                return android.view.KeyEvent.KEYCODE_2;
+            case 3:
+                return android.view.KeyEvent.KEYCODE_3;
+            case 4:
+                return android.view.KeyEvent.KEYCODE_4;
+            case 5:
+                return android.view.KeyEvent.KEYCODE_5;
+            case 6:
+                return android.view.KeyEvent.KEYCODE_6;
+            case 7:
+                return android.view.KeyEvent.KEYCODE_7;
+            case 8:
+                return android.view.KeyEvent.KEYCODE_8;
+            case 9:
+                return android.view.KeyEvent.KEYCODE_9;
+            default:
+                return android.view.KeyEvent.KEYCODE_0;
         }
     }
 
@@ -480,7 +504,6 @@ public class OverlayService extends Service {
                     numberKeyboardVisible = false;
                 } else {
                     showNumberKeyboard();
-                    numberKeyboardVisible = numberView != null;
                 }
             }
 
@@ -513,4 +536,4 @@ public class OverlayService extends Service {
             numberView = null;
         }
     }
-}
+    }
