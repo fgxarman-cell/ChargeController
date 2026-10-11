@@ -73,12 +73,14 @@ public class OverlayService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (overlayView == null) {
-            showOverlay();
-        }
+        if (!numberKeyboardVisible) {
+            if (overlayView == null) {
+                showOverlay();
+            }
 
-        if (spaceView == null) {
-            showSpaceButton();
+            if (spaceView == null) {
+                showSpaceButton();
+            }
         }
 
         return START_STICKY;
@@ -357,6 +359,9 @@ public class OverlayService extends Service {
             return;
         }
 
+        removeOverlay();
+        removeSpaceButton();
+
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(8, 8, 8, 8);
@@ -370,6 +375,16 @@ public class OverlayService extends Service {
         LinearLayout titleRow = new LinearLayout(this);
         titleRow.setOrientation(LinearLayout.HORIZONTAL);
         titleRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        Button menuButton = new Button(this);
+        menuButton.setText("☰");
+        menuButton.setTextSize(18);
+        menuButton.setTextColor(Color.WHITE);
+        menuButton.setMinWidth(48);
+        menuButton.setMinHeight(48);
+        menuButton.setPadding(4, 0, 4, 0);
+        menuButton.setOnClickListener(v -> showKeyboardModeMenu(v));
+        titleRow.addView(menuButton);
 
         TextView title = new TextView(this);
         title.setText(" 1234567890 ");
@@ -387,6 +402,7 @@ public class OverlayService extends Service {
             numberKeyboardVisible = false;
         });
         titleRow.addView(closeButton);
+
         root.addView(titleRow);
 
         LinearLayout firstRow = new LinearLayout(this);
@@ -470,6 +486,26 @@ public class OverlayService extends Service {
         }
     }
 
+    private void showKeyboardModeMenu(View anchor) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+
+        menu.getMenu().add(0, 1, 0, "Normal WASD + SPACE");
+
+        menu.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == 1) {
+                removeNumberKeyboard();
+                numberKeyboardVisible = false;
+
+                showOverlay();
+                showSpaceButton();
+            }
+
+            return true;
+        });
+
+        menu.show();
+    }
+
     private int getNumberKeyCode(int number) {
         switch (number) {
             case 1: return android.view.KeyEvent.KEYCODE_1;
@@ -544,6 +580,9 @@ public class OverlayService extends Service {
                 if (numberKeyboardVisible) {
                     removeNumberKeyboard();
                     numberKeyboardVisible = false;
+
+                    showOverlay();
+                    showSpaceButton();
                 } else {
                     showNumberKeyboard();
                     numberKeyboardVisible = numberView != null;
