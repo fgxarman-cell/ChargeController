@@ -1,3 +1,4 @@
+
 package com.armancraft.chargecontroller;
 
 import android.app.Notification;
@@ -24,11 +25,15 @@ import android.widget.TextView;
 
 import androidx.core.app.NotificationCompat;
 
+import java.io.File;
+
 public class OverlayService extends Service {
 
     private static final String TAG = "OverlayService";
     private static final String CHANNEL_ID = "charge_controller_overlay";
     private static final int NOTIFICATION_ID = 1001;
+    private static final String WASD_FILE_PATH =
+            "/storage/emulated/0/wasd/wasd.bal";
 
     private WindowManager windowManager;
 
@@ -66,11 +71,35 @@ public class OverlayService extends Service {
     private int zeroInitialTouchX;
     private int zeroInitialTouchY;
 
+    private boolean isWasdFileAvailable() {
+        return new File(WASD_FILE_PATH).isFile();
+    }
+
+    private boolean canShowOverlay() {
+        if (!isWasdFileAvailable()) {
+            Log.w(TAG, "wasd.bal bulunamadi. Overlay acilmayacak.");
+            return false;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && !Settings.canDrawOverlays(this)) {
+            Log.w(TAG, "Overlay izni verilmemis.");
+            return false;
+        }
+
+        return true;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
 
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+
+        if (!canShowOverlay()) {
+            stopSelf();
+            return;
+        }
 
         createNotificationChannel();
         startForeground(NOTIFICATION_ID, buildNotification());
@@ -81,6 +110,16 @@ public class OverlayService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (!canShowOverlay()) {
+            removeOverlay();
+            removeSpaceButton();
+            removeNumberKeyboard();
+            removeZeroButton();
+            stopForeground(true);
+            stopSelf();
+            return START_NOT_STICKY;
+        }
+
         if (!numberKeyboardVisible) {
             if (overlayView == null) {
                 showOverlay();
@@ -91,7 +130,7 @@ public class OverlayService extends Service {
             }
         }
 
-        return START_STICKY;
+        return START_NOT_STICKY;
     }
 
     @Override
@@ -172,9 +211,7 @@ public class OverlayService extends Service {
     }
 
     private void showOverlay() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-                && !Settings.canDrawOverlays(this)) {
-            stopSelf();
+        if (!canShowOverlay()) {
             return;
         }
 
@@ -296,7 +333,7 @@ public class OverlayService extends Service {
     }
 
     private void showSpaceButton() {
-        if (spaceView != null) {
+        if (!canShowOverlay() || spaceView != null) {
             return;
         }
 
@@ -362,7 +399,7 @@ public class OverlayService extends Service {
     }
 
     private void showNumberKeyboard() {
-        if (numberView != null) {
+        if (!canShowOverlay() || numberView != null) {
             return;
         }
 
@@ -493,7 +530,7 @@ public class OverlayService extends Service {
     }
 
     private void showZeroButton() {
-        if (zeroView != null) {
+        if (!canShowOverlay() || zeroView != null) {
             return;
         }
 
@@ -650,6 +687,15 @@ public class OverlayService extends Service {
                 startActivity(intent);
 
             } else if (item.getItemId() == 2) {
+                if (!canShowOverlay()) {
+                    removeOverlay();
+                    removeSpaceButton();
+                    removeNumberKeyboard();
+                    removeZeroButton();
+                    stopSelf();
+                    return true;
+                }
+
                 if (numberKeyboardVisible) {
                     removeNumberKeyboard();
                     removeZeroButton();
@@ -716,4 +762,4 @@ public class OverlayService extends Service {
             numberView = null;
         }
     }
-        }
+}
